@@ -1,0 +1,83 @@
+#!/bin/bash
+#####################################################
+#
+# Description: creates a pack for neomanis project
+# Author: Arno68000
+# Date: 2023
+# Version: 1.0.0
+#
+####################################################
+
+show_help(){
+	echo "
+		Description:	Creates a pack for neomanis project
+
+		Usage: 		pack [options]...
+
+		Options:
+		                --keep/-k:	keep actual version from package.json
+				--help:		show help
+	"
+}
+check_result(){
+	if [ ${1} -ne 0 ]; then
+		exit 1
+	fi
+}
+shuffle(){
+	echo $(shuf -i 99-999 -n1)
+}
+change_package_version(){
+	package="${PWD}/package.json"
+	if [ ! -f ${package} ]; then
+		echo -e "\033[31mError:\033[0m no package.json"
+		exit 1
+	fi
+	new_version=$(echo "$(shuffle).$(shuffle).$(shuffle)")
+	sed -i "s|\(\"version\": \"\)\(.*\..*\..*\)\(\"\)|\1${new_version}\3|g" ${package}
+}
+rm_build_dir(){
+	build_dir="${PWD}/build"
+	if [ -d ${build_dir} ]; then
+		rm -rf ${build_dir}
+		check_result $?
+	fi
+}
+rm_old_pack(){
+	pack_file=$(ls | grep "neomanis*")
+	if [ -f "${PWD}/${pack_file}" ]; then
+		rm "${PWD}/${pack_file}"
+		check_result $?
+	fi
+}
+
+main(){
+	rm_build_dir
+	rm_old_pack
+
+	if [ -z "${1}" ]; then
+		change_package_version
+	fi
+
+	yarn build
+	check_result $?
+	yarn pack
+	check_result $?
+}
+
+keep=""
+if [ ! -z "${1}" ]; then
+	if [ "${1}" == "--help" ]; then
+		show_help
+		exit 0
+	elif [[ "${1}" =~ ^(-k|--keep)$ ]]; then
+		keep="true"
+	else
+		echo -e "\033[31mError:\033[0m option '$1' not available, please use --help for documentation"
+		exit 1
+	fi
+fi
+echo -e "\033[32mStarting...\033[0m"
+main $keep
+echo -e "\033[32mDone\033[0m"
+exit 0

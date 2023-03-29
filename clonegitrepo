@@ -1,0 +1,198 @@
+#!/bin/bash
+
+#############################################################################################################
+#
+# Description: Clones a remote git repository, creates or move to dev branch and setup .env & husky if needed
+# Author: Arno68000
+# Date: 2023
+# Version: 1.0.0
+#
+##############################################################################################################
+
+show_help(){
+	echo "
+		Description: 	Clones a git repository to the current directory, checks out to dev branch
+	       			(creates it if needed) and sets up .env file if a .env.example is provided 
+				by repository. Also runs husky:setup if	command is available in package.json.
+
+		Usage:		clonegitrepo [options]... [url]...
+
+		If url is not provided, the script will ask for it.
+		If force option is not provided and a directory already exists, the script will ask for confirmation
+
+		Options:
+			--force/-f  : removes the current repo directory if it exists without asking for validation
+			--help      : show help
+		"
+}
+
+# PRINT FUNCTIONS WITH COLOR: take a message argument
+print_error(){
+	local message="$1"
+       	if [ ! -z "${message}" ]; then
+	       	echo -e "\033[31mError: \033[0m$1"
+	fi
+}
+print_success(){
+	local message="$1"
+	if [ ! -z "${message}" ]; then
+	 	echo -e "\033[32m$1\033[0m"
+	fi
+}
+print_info(){
+	local message="$1"
+	if [ ! -z "${message}" ]; then
+		echo -e "\033[34mInfo: \033[0m$1"
+	fi
+}
+# args => [question] [valid_responses(optionnal)]
+print_question(){
+	local message="$1"
+	if [ ! -z "${message}" ]; then
+		echo -en "\033[36m$1\033[33m$2\033[0m : "
+	fi
+}
+
+clone_repo(){
+	git clone "$1" 2>/dev/null
+	clone_result=$?
+	if [ $clone_result -gt 0 ]; then
+		print_error "Cloning $1 failed"
+		exit 1
+	fi
+}   
+
+move_to_directory(){
+	cd "$1"
+	print_info "Moved to ${PWD}"
+}
+
+extract_dirname(){
+	dirname=$(echo "$1" | sed 's/.*\/\([^/]*\)\.git/\1/')
+	echo "${dirname}"
+}
+
+setup_environment_file(){
+	env_example_file="${PWD}/.env.example"
+	env_file="${PWD}/.env"
+	if [ -f "${env_example_file}" ]; then
+		cp "${env_example_file}" "${env_file}"
+		print_info "Environment file updated"
+	else	
+		print_info "No env_example file detected"
+	fi
+}
+
+install_dependencies(){
+	yarn install
+	install_result=$?
+	if [ $install_result -ne 0 ]; then
+		print_error "Something went wrong with 'yarn install' execution"
+		exit 1
+  	fi
+}
+
+move_to_dev(){
+  	git checkout dev 2>/dev/null
+  	dev_branch=$?
+  	if [ $dev_branch -gt 0 ]; then
+		print_info "No 'dev' branch found: creating 'dev' branch..."
+		git checkout -b dev
+	else
+		git pull
+  	fi
+}
+
+check_husky(){
+  	package_file="$PWD/package.json"
+  	husky_command="husky:setup"
+  	if [ -f "${package_file}" ]; then
+		if grep "$husky_command" "${package_file}"; then
+			print_info "Setting up husky..."
+			yarn $husky_command
+		else
+			print_info "No husky command found"
+		fi
+  	fi
+}
+
+ask_for_delete(){
+		print_question "Repository already present in ${PWD}, do you want to replace it ?" "(Y/N)"
+		read validated
+		case ${validated} in
+			"N")
+				return 2;	
+				;;
+			"Y")
+				return 0;
+				;;
+			*)
+				return 1;
+				;;
+		esac
+}
+
+execute_setup_actions(){
+	install_dependencies
+	move_to_dev
+	setup_environment_file
+	check_husky
+}
+
+main(){
+	force=1
+	remote_url=""
+
+	for arg in $* 
+	do
+	       	case "$arg" in
+	 		"--force"|"-f")
+				force=0
+				;;
+			*)
+				remote_url="$arg"
+				;;
+		esac
+	done
+
+	while [ -z "${remote_url}" ]
+	do
+		print_question "Enter the remote repository address you want to clone"
+		read remote_url
+	done
+
+	dirname=$(extract_dirname "${remote_url}")
+	dir="${PWD}/${dirname}"
+
+	if [ ! -d "${dir}" ]; then
+		clone_repo "${remote_url}"
+		move_to_directory "${dir}"
+		execute_setup_actions
+	else
+		while [ $force -eq 1 ] 
+		do
+			ask_for_delete
+			force=$?
+		done
+		if [ $force -eq 0 ]; then
+			print_info "Removing old data and re-cloning..."
+			rm -rf "${dir}"
+			clone_repo "${remote_url}"
+			move_to_directory "${dir}"
+			execute_setup_actions
+		else
+			print_info "Aborting cloning process..."
+		fi
+	fi
+
+}
+
+if [ "$1" == "--help" ]; then
+	show_help
+	exit 0
+fi
+
+print_success "Starting script..."
+main $*
+print_success "Done"
+exit 0
