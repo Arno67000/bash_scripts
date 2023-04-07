@@ -28,14 +28,13 @@ shuffle(){
 	echo $(shuf -i 99-999 -n1)
 }
 change_package_version(){
-	package="${PWD}/package.json"
-	if [ ! -f ${package} ]; then
-		echo -e "\033[31mError:\033[0m no package.json"
-		exit 1
+	new_version="${2}"
+	if [ -z "${new_version}" ]; then
+		new_version=$(echo "$(shuffle).$(shuffle).$(shuffle)")
 	fi
-	new_version=$(echo "$(shuffle).$(shuffle).$(shuffle)")
-	sed -i "s|\(\"version\": \"\)\(.*\..*\..*\)\(\"\)|\1${new_version}\3|g" ${package}
+	sed -i "s|\(\"version\": \"\)\(.*\)\(\"\)|\1${new_version}\3|g" ${1}
 }
+
 rm_build_dir(){
 	build_dir="${PWD}/build"
 	if [ -d ${build_dir} ]; then
@@ -55,15 +54,32 @@ rm_old_packs(){
 main(){
 	rm_build_dir
 	rm_old_packs
+	package="${PWD}/package.json"
+	if [ ! -f ${package} ]; then
+		echo -e "\033[31mError:\033[0m no package.json"
+		exit 1
+	fi
+	old_version=$(grep -e 'version' "${package}" | sed -e 's/[^0-9.]*//g')
+	echo "Current version: $old_version"
 
 	if [ -z "${1}" ]; then
-		change_package_version
+		change_package_version "${package}"
 	fi
 
 	yarn build
-	check_result $?
+	if [ $? -ne 0 ]; then
+		echo -e "\033[31mError:\033[0m build failed"
+	fi
+
 	yarn pack
-	check_result $?
+	if [ $? -ne 0 ]; then
+		echo -e "\033[31mError:\033[0m pack bundle failed"
+	fi
+
+	#restoring package.json if necessary
+	if [ -z "${1}" ]; then
+		change_package_version "${package}" "${old_version}"
+	fi
 }
 
 keep=""
