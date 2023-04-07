@@ -45,7 +45,6 @@ rm_build_dir(){
 }
 rm_old_packs(){
 	ls | grep "neomanis*" | while read -r file; do 
-		echo "$file"
 		if [ -f "${PWD}/${file}" ]; then
 			rm "${PWD}/${file}"
 			check_result $?
