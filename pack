@@ -43,17 +43,19 @@ rm_build_dir(){
 		check_result $?
 	fi
 }
-rm_old_pack(){
-	pack_file=$(ls | grep "neomanis*")
-	if [ -f "${PWD}/${pack_file}" ]; then
-		rm "${PWD}/${pack_file}"
-		check_result $?
-	fi
+rm_old_packs(){
+	ls | grep "neomanis*" | while read -r file; do 
+		echo "$file"
+		if [ -f "${PWD}/${file}" ]; then
+			rm "${PWD}/${file}"
+			check_result $?
+		fi
+	done
 }
 
 main(){
 	rm_build_dir
-	rm_old_pack
+	rm_old_packs
 
 	if [ -z "${1}" ]; then
 		change_package_version
