@@ -150,20 +150,24 @@ execute_setup_actions(){
 main(){
 	force=1
 	remote_url=""
-	if [[ "${1}" =~ ^(-f|--force)$ ]]; then
-		force=0
-	elif [[ "${1}" =~ ^(--help)$ ]]; then
-		show_help
-		exit 0
-	else
-		test_url "${1}"
-		if [ $? -eq 0 ]; then
-			remote_url="${1}"
+
+	if [ ! -z "${1}" ]; then
+		if [[ "${1}" =~ ^(-f|--force)$ ]]; then
+			force=0
+		elif [[ "${1}" =~ ^(--help)$ ]]; then
+			show_help
+			exit 0
 		else
-			print_error "Invalid argument, please use '--help' option for more information"
-			exit 1
+			test_url "${1}"
+			if [ $? -eq 0 ]; then
+				remote_url="${1}"
+			else
+				print_error "Invalid argument, please use '--help' option for more information"
+				exit 1
+			fi
 		fi
 	fi
+
 	if [ -z "${remote_url}" ] && [ ! -z "${2}" ]; then
 		test_url "${2}"
 		if [ $? -eq 0 ]; then
